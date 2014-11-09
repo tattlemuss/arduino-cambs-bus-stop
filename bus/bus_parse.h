@@ -2,9 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
+#define ARRAY_COUNT(x)    (sizeof(x)/sizeof(x[0]))
+
 // :TODO: handle non-standard times (17:38)
+
+// TODO: use sizeof String literal (it includes null)
 const char* g_pStartString = "<td class=\"body-cell\" align=\"right\">";
 size_t g_startSize = strlen(g_pStartString);
+#define START_SIZE    ARRAY_COUNT(g_pStartString)
 
 const char* g_pNowString = "</span> at <span class=\"emphasise\">";
 size_t g_nowSize = strlen(g_pNowString);
@@ -12,6 +17,13 @@ size_t g_nowSize = strlen(g_pNowString);
 const char* g_pEndString = "</td><td";
 size_t g_endSize = strlen(g_pEndString);
 
+/*
+  Class to keep a circular buffer of the last N characters added
+  to it, and match a string in this last N characters.
+  
+  Used to keep the amount of memory down (the webpage scraped is
+  bigger than the Arduino's storage!)
+*/
 struct RollingBuffer
 {
 	void init();
@@ -21,26 +33,29 @@ struct RollingBuffer
 	static const uint16_t kBufSize = 100;
 
 	char			m_buf[kBufSize];
-	uint16_t		m_inBuf;			// Number of entries in m_buf that are valid
+	uint16_t		m_validCount;			// Number of entries in m_buf that are valid
 	uint16_t		m_nextOff;			// Where next character will be written
 };
 
 void RollingBuffer::init()
 {
-	m_inBuf = 0;
+	m_validCount = 0;
 	m_nextOff = 0;
+        // No need to zero the buffer itself
 }
 
 void RollingBuffer::add(char ch)
 {
 	m_buf[m_nextOff] = ch;
 	m_nextOff = (m_nextOff + 1U) % kBufSize;
-	if (m_inBuf < kBufSize)
-		++m_inBuf;
+        // Update the number of valid characters
+	if (m_validCount < kBufSize)
+		++m_validCount;
 }
 
 bool RollingBuffer::match(const char* pString, uint16_t len)
 {
+        // Can't match something too big...
 	if (len > kBufSize)
 		return false;
 
